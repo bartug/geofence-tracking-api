@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: geofence-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-geofence_tracking}
+      POSTGRES_USER: ${DB_USER:-geofence}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-geofence}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - geofence-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-geofence} -d ${DB_NAME:-geofence_tracking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: geofence-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: geofence-tracking-api:1.0.0
+    container_name: geofence-app
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  geofence-postgres-data:
